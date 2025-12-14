@@ -1,0 +1,7 @@
+touch requirements.txt
+open -e requirements.txt
+```
+
+Add this inside:
+```
+streamlit
