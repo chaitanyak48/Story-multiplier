@@ -1,0 +1,493 @@
+{
+  "name": "NatGeo Story Performance Analyzer - Simple",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## NatGeo Story Analyzer\n\nThis workflow:\n1. Takes a NatGeo article URL\n2. Extracts article content\n3. Analyzes social shareability\n4. Saves data for insights",
+        "height": 203.28906250000003,
+        "width": 323.59375
+      },
+      "id": "ea243d78-970c-4ec6-9f6a-26edd1d04128",
+      "name": "Workflow Description",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -176,
+        -240
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {},
+      "id": "9ef13195-8d6c-4f53-86bb-039be7ba980c",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "position": [
+        -32,
+        16
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "93a90256-eb13-46ea-97b7-6d45371f185d",
+              "name": "",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "4e8f9bf8-6b78-497c-91ba-b614bb3a04b6",
+              "name": "",
+              "value": "const testUrls = [\n  \"https://kids.nationalgeographic.com/history/article/we-want-to-vote-battles-for-the-ballot\",\n  \"https://www.nationalgeographic.com/animals/article/polar-bears\",\n  \"https://www.nationalgeographic.com/travel/article/best-of-world-2024\"\n];",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f5f9665e-32e1-43d5-9c01-7aba359bc8d1",
+      "name": "Set Test Article URL",
+      "type": "n8n-nodes-base.set",
+      "position": [
+        192,
+        -80
+      ],
+      "typeVersion": 3.4,
+      "executeOnce": false,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "url": "https://kids.nationalgeographic.com/animals/mammals/facts/arctic-fox",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0 Safari/537.36"
+            },
+            {
+              "name": "Accept",
+              "value": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+            },
+            {
+              "name": "Accept-language",
+              "value": "en-US,en;q=0.9"
+            },
+            {
+              "name": "Referrer",
+              "value": "https://kids.nationalgeographic.com/history/article/we-want-to-vote-battles-for-the-ballot"
+            },
+            {}
+          ]
+        },
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": true
+            }
+          },
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "id": "674baa58-8042-497a-a0ef-5eb53457671d",
+      "name": "Fetch Article HTML",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        416,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Extract article content from HTML\nconst html = items[0].json.data || items[0].json;\nconst url = items[0].json.url;\n\n// Basic content extraction\nconst extractContent = (html) => {\n  // Extract title\n  const titleMatch = html.match(/<title>([^<]+)<\\/title>/i);\n  const title = titleMatch ? titleMatch[1].replace(' | National Geographic Kids', '').trim() : 'Unknown Title';\n  \n  // Extract main text (remove HTML tags)\n  const textContent = html\n    .replace(/<script[^>]*>[\\s\\S]*?<\\/script>/gi, '')\n    .replace(/<style[^>]*>[\\s\\S]*?<\\/style>/gi, '')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n  \n  // Extract first paragraph for summary\n  const paragraphMatch = html.match(/<p[^>]*>([^<]+)<\\/p>/i);\n  const firstParagraph = paragraphMatch ? paragraphMatch[1].trim() : '';\n  \n  // Count images\n  const imageMatches = html.match(/<img[^>]+>/gi) || [];\n  const imageCount = imageMatches.length;\n  \n  // Extract meta description\n  const metaMatch = html.match(/<meta[^>]*name=\"description\"[^>]*content=\"([^\"]+)\"/i);\n  const metaDescription = metaMatch ? metaMatch[1] : '';\n  \n  return {\n    title,\n    firstParagraph,\n    metaDescription,\n    wordCount: textContent.split(' ').length,\n    imageCount,\n    textSnippet: textContent.substring(0, 500)\n  };\n};\n\nconst content = extractContent(html.toString());\n\nreturn [{\n  json: {\n    url: url,\n    ...content,\n    extractedAt: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "785421fd-5f5c-4031-a7b6-cd34c998034b",
+      "name": "Extract Article Content",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        640,
+        -80
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "functionCode": "// Analyze content for social media potential\nconst article = items[0].json;\n\n// Simple shareability analysis\nconst analyzeShareability = (article) => {\n  const scores = {\n    emotional: 0,\n    curiosity: 0,\n    visual: 0,\n    readability: 0,\n    overall: 0\n  };\n  \n  const insights = [];\n  const title = article.title || '';\n  const text = article.textSnippet || '';\n  \n  // Emotional triggers (words that drive engagement)\n  const emotionalWords = ['amazing', 'incredible', 'shocking', 'unbelievable', 'extraordinary', 'dangerous', 'mysterious', 'discover', 'reveal', 'secret'];\n  const emotionalCount = emotionalWords.filter(word => \n    text.toLowerCase().includes(word) || title.toLowerCase().includes(word)\n  ).length;\n  scores.emotional = Math.min(emotionalCount * 20, 100);\n  if (scores.emotional > 40) insights.push('Contains emotional triggers');\n  \n  // Curiosity gaps\n  const curiosityPatterns = ['how', 'why', 'what', 'when', 'where', '?'];\n  const curiosityCount = curiosityPatterns.filter(pattern => \n    title.toLowerCase().includes(pattern)\n  ).length;\n  scores.curiosity = Math.min(curiosityCount * 25, 100);\n  if (scores.curiosity > 0) insights.push('Title creates curiosity gap');\n  \n  // Visual content\n  scores.visual = Math.min(article.imageCount * 10, 100);\n  if (scores.visual > 50) insights.push('Rich visual content');\n  \n  // Readability (simple = better for social)\n  const avgWordLength = text.split(' ').reduce((acc, word) => acc + word.length, 0) / text.split(' ').length;\n  scores.readability = avgWordLength < 6 ? 80 : avgWordLength < 8 ? 60 : 40;\n  if (scores.readability > 60) insights.push('Easy to read');\n  \n  // Calculate overall score\n  scores.overall = Math.round(\n    (scores.emotional + scores.curiosity + scores.visual + scores.readability) / 4\n  );\n  \n  // Platform recommendations\n  const recommendations = [];\n  if (scores.visual > 70) recommendations.push('Instagram - High visual appeal');\n  if (scores.curiosity > 60) recommendations.push('TikTok - Strong hook potential');\n  if (scores.emotional > 50) recommendations.push('Twitter - Emotional resonance');\n  if (scores.readability > 70) recommendations.push('LinkedIn - Professional clarity');\n  \n  return {\n    scores,\n    insights,\n    recommendations,\n    shareabilityRating: scores.overall > 70 ? 'High' : scores.overall > 50 ? 'Medium' : 'Low'\n  };\n};\n\nconst analysis = analyzeShareability(article);\n\nreturn [{\n  json: {\n    ...article,\n    shareability: analysis\n  }\n}];"
+      },
+      "id": "500e4cc1-e7df-47f2-bc80-b5ad7f048d98",
+      "name": "Analyze Shareability",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        1216,
+        -80
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "functionCode": "// Generate social media hooks based on analysis\nconst data = items[0].json;\n\n// Simple hook generator (no AI needed)\nconst generateHooks = (article) => {\n  const title = article.title || 'Amazing Discovery';\n  const firstParagraph = article.firstParagraph || '';\n  \n  // Extract key elements\n  const hasNumbers = title.match(/\\d+/);\n  const number = hasNumbers ? hasNumbers[0] : '10';\n  \n  // Generate platform-specific hooks\n  const hooks = {\n    instagram: {\n      primary: `🌍 ${title}`,\n      carousel_opener: `Swipe to discover something incredible about ${title.split(' ')[0]}...`,\n      cta: 'Link in bio for full story'\n    },\n    \n    tiktok: {\n      opener: `You won't believe what scientists just discovered`,\n      hook: title.length > 50 ? title.substring(0, 50) + '...' : title,\n      format: 'POV: You just learned something that will blow your mind'\n    },\n    \n    twitter: {\n      thread_starter: `🧵 ${title}\\n\\nA thread on why this matters:`,\n      single_tweet: title.length > 200 ? title.substring(0, 200) + '...' : title,\n      quote_tweet: `This changes everything we thought we knew`\n    },\n    \n    linkedin: {\n      professional: `Key Insights: ${title}`,\n      thought_leadership: `What we can learn from ${title.split(' ').slice(0, 5).join(' ')}...`,\n      discussion_starter: `Curious about your thoughts on this discovery`\n    },\n    \n    youtube: {\n      shorts_title: title.length > 60 ? title.substring(0, 57) + '...' : title,\n      thumbnail_text: hasNumbers ? `${number} SHOCKING FACTS` : 'MUST SEE',\n      description_hook: `In this video, we explore ${title.toLowerCase()}`\n    }\n  };\n  \n  // Content snippets for each platform\n  const snippets = {\n    short: firstParagraph.substring(0, 100) + '...',\n    medium: firstParagraph.substring(0, 200) + '...',\n    long: firstParagraph\n  };\n  \n  return {\n    hooks,\n    snippets,\n    hashtags: {\n      general: '#NationalGeographic #Discovery #Science #Education',\n      instagram: '#NatGeo #InstaScience #DidYouKnow #ExploreMore',\n      tiktok: '#FYP #LearnOnTikTok #ScienceFacts #MindBlown',\n      twitter: '#Science #Breaking #Research #Nature'\n    }\n  };\n};\n\nconst socialContent = generateHooks(data);\n\nreturn [{\n  json: {\n    ...data,\n    generatedContent: socialContent,\n    totalHooks: 15\n  }\n}];"
+      },
+      "id": "b2bb050f-69a8-49f8-b384-5e73ddb5f9f3",
+      "name": "Generate Social Hooks",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        1664,
+        16
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "functionCode": "// Compile final analysis and structure data\nconst data = (items[0] && items[0].json) ? items[0].json : {};\n \nconst finalAnalysis = {\n  metadata: {\n    analysisId: Date.now().toString(),\n    timestamp: new Date().toISOString(),\n    url: data.url ?? null,\n  },\n  articleInfo: {\n    title: data.title ?? \"Unknown Title\",\n    wordCount: data.wordCount ?? 0,\n    imageCount: data.imageCount ?? 0,\n    firstParagraph: data.firstParagraph ?? \"\",\n    metaDescription: data.metaDescription ?? \"\",\n  },\n  shareabilityAnalysis: data.shareability ?? {\n    scores: { visual: 0, emotional: 0, curiosity: 0 },\n    shareabilityRating: \"Unknown\",\n    recommendations: [],\n  },\n  generatedContent: {\n    hooks: (data.generatedContent && data.generatedContent.hooks) || [],\n    snippets: (data.generatedContent && data.generatedContent.snippets) || [],\n    hashtags: (data.generatedContent && data.generatedContent.hashtags) || [],\n  },\n  trendAnalysis: data.trendAnalysis ?? {},\n  recommendations: {\n    topPlatforms: (data.shareability && data.shareability.recommendations) || [],\n    contentStrategy: [\n      (data.shareability?.scores?.visual ?? 0) > 70 ? \"Focus on visual content\" : \"Add more images\",\n      (data.shareability?.scores?.emotional ?? 0) > 50 ? \"Leverage emotional angle\" : \"Add emotional hooks\",\n      (data.shareability?.scores?.curiosity ?? 0) > 60 ? \"Use curiosity-driven titles\" : \"Create knowledge gaps\",\n      \"Post during peak hours (12-2 PM, 7-9 PM)\",\n    ],\n    estimatedEngagement: {\n      low: 1000,\n      medium: 5000,\n      high: 10000,\n      predicted:\n        (data.shareability?.shareabilityRating === \"High\") ? 8000 :\n        (data.shareability?.shareabilityRating === \"Medium\") ? 4000 : 2000,\n    },\n  },\n  actionItems: [\n    \"Create Instagram carousel with 5 slides\",\n    \"Film 30-second TikTok with strong hook\",\n    \"Write Twitter thread (5 tweets)\",\n    \"Draft LinkedIn post with professional angle\",\n    \"Create YouTube Shorts script\",\n  ],\n};\n \n// --- make a binary JSON file so \"Save to JSON File\" can consume it ---\nconst fileName = `natgeo_analysis_${finalAnalysis.metadata.analysisId}.json`;\nconst buf = Buffer.from(JSON.stringify(finalAnalysis, null, 2));\n \nreturn [{\n  json: finalAnalysis,\n  binary: {\n    file: {\n      data: buf.toString('base64'),\n      fileName,\n      mimeType: 'application/json',\n    }\n  }\n}];"
+      },
+      "id": "95f43cab-ad60-4e5f-99b9-1b033647b3d6",
+      "name": "Structure Final Data",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        1888,
+        16
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "fileName": "=natgeo_analysis_{{$json[\"metadata\"][\"analysisId\"]}}.json",
+        "dataPropertyName": "=file",
+        "options": {
+          "append": false
+        }
+      },
+      "id": "81b27c63-563f-44df-b17f-bacb6a6f4e9f",
+      "name": "Save to JSON File",
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "position": [
+        2112,
+        16
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "functionCode": "// Display summary of analysis\nconst data = items[0].json;\n\nconst summary = {\n  '📊 Analysis Complete': {\n    'Article': data.articleInfo.title,\n    'Shareability Score': data.shareabilityAnalysis.scores.overall + '/100',\n    'Rating': data.shareabilityAnalysis.shareabilityRating,\n    'Best Platforms': data.recommendations.topPlatforms,\n    'Estimated Reach': data.recommendations.estimatedEngagement.predicted + ' users',\n    'Hooks Generated': 15,\n    'File Saved': `natgeo_analysis_${data.metadata.analysisId}.json`\n  },\n  \n  '🎯 Top Insights': data.shareabilityAnalysis.insights,\n  \n  '📱 Platform Hooks': {\n    'Instagram': data.generatedContent.hooks.instagram.primary,\n    'TikTok': data.generatedContent.hooks.tiktok.opener,\n    'Twitter': data.generatedContent.hooks.twitter.single_tweet\n  },\n  \n  '✅ Next Steps': data.actionItems\n};\n\nreturn [{\n  json: summary\n}];"
+      },
+      "id": "f26b5528-5028-4924-ad9a-0028facbfce2",
+      "name": "Display Summary",
+      "type": "n8n-nodes-base.function",
+      "position": [
+        2336,
+        16
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1440,
+        16
+      ],
+      "id": "ce05e1cb-9270-40ed-9d51-31d0f64e3739",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/customsearch/v1",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "AIzaSyC-2xEqU192At-6dEFl6Ynkg-lurS3LXB8"
+            },
+            {
+              "name": "cx",
+              "value": "83321d3b14acf4ba1"
+            },
+            {
+              "name": "q",
+              "value": "={{$json.query}}"
+            },
+            {
+              "name": "num",
+              "value": "10"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        928,
+        112
+      ],
+      "id": "abb30576-f345-475e-b730-84f8f779b741",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a0bbec29-2d5e-46f8-9e04-31d0522dfd7a",
+              "name": "query",
+              "value": "archetype explorer storytelling site:nationalgeographic.com",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        640,
+        112
+      ],
+      "id": "f078e1e2-7eac-4b50-bdb7-4f15ab3514a9",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = items[0].json.items || [];\nreturn results.map(r => ({\n  json: {\n    url: r.link,\n    title: r.title,\n    snippet: r.snippet,\n    source: 'google_cse'\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1216,
+        112
+      ],
+      "id": "940a7378-cc9b-4793-97d2-27356690061d",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are an expert content analyst for geo-focused educational stories (like National Geographic Kids).\nYour task is to analyze article content and produce structured insights for social media strategy.\n \nRules:\n- Be concise but specific.\n- Use only information in the article text and metadata.\n- When you output JSON, it must be valid JSON with double quotes, no comments, and no markdown.\n\n"
+            },
+            {
+              "content": "='Analyze the following article and respond ONLY with a single JSON object.\\n\\n' +\n'ARTICLE METADATA:\\n' +\n'Title: ' + $json[\"title\"] + '\\n' +\n'First paragraph: ' + $json[\"firstParagraph\"] + '\\n' +\n'Meta description: ' + $json[\"metaDescription\"] + '\\n' +\n'Text snippet: ' + $json[\"textSnippet\"] + '\\n' +\n'Word count: ' + $json[\"wordCount\"] + '\\n' +\n'Image count: ' + $json[\"imageCount\"] + '\\n\\n' +\n'REQUIREMENTS:\\n' +\n'1. Give a 2–3 sentence summary of the article.\\n' +\n'2. List 3–7 key_topics (main subjects of the article).\\n' +\n'3. Identify primary_audience (e.g., kids 8–12, teens, teachers, general science readers, etc.).\\n' +\n'4. Give a shareability_score between 0 and 100 for how good this is for social media.\\n' +\n'5. Suggest 3–5 social_angles (story angles or hooks that would make people want to share).\\n' +\n'6. Suggest 5–10 hashtags relevant for social media.\\n' +\n'7. Suggest 2–3 recommended_platforms (choose from: \"Instagram\", \"TikTok\", \"YouTube\", \"X/Twitter\", \"Facebook\", \"LinkedIn\").\\n' +\n'8. List any geo_focus locations (countries, cities, regions) mentioned or clearly implied.\\n\\n' +\n'OUTPUT FORMAT (very important):\\n' +\n'{\\n' +\n'  \"summary\": \"string\",\\n' +\n'  \"key_topics\": [\"string\", \"...\"],\\n' +\n'  \"primary_audience\": \"string\",\\n' +\n'  \"shareability_score\": 0,\\n' +\n'  \"social_angles\": [\"string\", \"...\"],\\n' +\n'  \"hashtags\": [\"string\", \"...\"],\\n' +\n'  \"recommended_platforms\": [\"string\", \"...\"],\\n' +\n'  \"geo_focus\": [\"string\", \"...\"]\\n' +\n'}\\n' +\n'Again: return ONLY the JSON object, no explanations, no markdown.'"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2,
+      "position": [
+        864,
+        -80
+      ],
+      "id": "ac94d457-f343-426f-8c10-d44e5b8d9e60",
+      "name": "Message a model",
+      "credentials": {
+        "openAiApi": {
+          "id": "qFmONSQYo2doOnJY",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "AI fused",
+        "height": 96,
+        "width": 150
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        912,
+        -208
+      ],
+      "typeVersion": 1,
+      "id": "6909fc57-f79c-45f0-9374-06a2b578669d",
+      "name": "Sticky Note"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Test Article URL",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Test Article URL": {
+      "main": [
+        [
+          {
+            "node": "Fetch Article HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Article HTML": {
+      "main": [
+        [
+          {
+            "node": "Extract Article Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Article Content": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Shareability": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Social Hooks": {
+      "main": [
+        [
+          {
+            "node": "Structure Final Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structure Final Data": {
+      "main": [
+        [
+          {
+            "node": "Save to JSON File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to JSON File": {
+      "main": [
+        [
+          {
+            "node": "Display Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Generate Social Hooks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Analyze Shareability",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "5889e74e-8ff0-4735-ae93-966e0b4c6d80",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "bf1b32933fe8f6919c7951881ff8c3851fbfd9897511adbd6d84627f58379089"
+  },
+  "id": "OedYXikH9LkywHCu",
+  "tags": []
+}
